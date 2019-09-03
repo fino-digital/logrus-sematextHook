@@ -38,7 +38,7 @@ func AccessLog() echo.MiddlewareFunc {
 			responseLength := strconv.FormatInt(res.Size, 10)
 			log.Logger().
 				WithFields(map[string]interface{}{
-					"RequesdId":     id,
+					"RequestId":     id,
 					"remoteAddress": c.RealIP(),
 					"timestamp":     stop.UnixNano(),
 
