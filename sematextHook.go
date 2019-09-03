@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/sirupsen/logrus"
-	)
+)
 
 // a hook that sends messages to sematext
 type sematextHook struct {
@@ -38,9 +38,9 @@ func NewSematextHook(client *resty.Client, baseUrl, group, facility, environment
 	basePath := s.ResolveReference(groupPath).String()
 
 	return &sematextHook{
-		client: client,
-		baseUrl: basePath,
-		facility: facility,
+		client:      client,
+		baseUrl:     basePath,
+		facility:    facility,
 		levelMapper: AsLogrusLevel,
 		environment: environment}, nil
 }
