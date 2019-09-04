@@ -2,11 +2,13 @@ package sematextHook
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"os"
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -154,6 +156,10 @@ func (s sematextHook) syncFire(entry *logrus.Entry) error {
 	return s.sendLogMessage(message)
 }
 
+type stackTracer interface {
+	StackTrace() errors.StackTrace
+}
+
 func (s sematextHook) sendLogMessage(message interface{}) error {
 	_, e := s.client.R().SetBody(message).Post(s.baseUrl)
 	return e
@@ -176,11 +182,22 @@ func (s sematextHook) sendWithExtraData(message *SematextMessage, fields logrus.
 			// do not allow overwriting
 			continue
 		}
+
+		if v == nil {
+			continue
+		}
+
 		str, ok := v.(string)
 		if ok && str == "" {
 			// skip empty fields
 			continue
 		}
+
+		if val, ok := v.(stackTracer); ok {
+			data[k] = fmt.Sprintf("%+v", val)
+			continue
+		}
+
 		data[k] = v
 	}
 
