@@ -2,6 +2,7 @@ package sematextHook
 
 import (
 	"encoding/json"
+	stdliberr "errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -16,17 +17,31 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func Test_SendingWithoutError(t *testing.T) {
+var srv *http.Server
+var port int
+var intercepted string
 
-	port, _ := freeport.GetFreePort()
+func startLogInterceptor() {
+	if srv != nil {
+		// lets assume that the server has been started already, but clear the intercepted message
+		intercepted = ""
+		return
+	}
 
-	var intercepted string
+	port, _ = freeport.GetFreePort()
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		bytes, _ := ioutil.ReadAll(r.Body)
 		intercepted = string(bytes)
 	})
-	go http.ListenAndServe(":"+strconv.Itoa(port), nil)
+
+	srv = &http.Server{Addr: ":" + strconv.Itoa(port), Handler: nil}
+	go srv.ListenAndServe()
+}
+
+func Test_SendingWithoutError(t *testing.T) {
+
+	startLogInterceptor()
 
 	hook, e := NewSematextHook(resty.New(), "http://localhost:"+strconv.Itoa(port), "test", "test", "test")
 	if e != nil {
@@ -52,15 +67,7 @@ func Test_SendingWithoutError(t *testing.T) {
 
 func Test_SendingWithoutEmptyObject(t *testing.T) {
 
-	port, _ := freeport.GetFreePort()
-
-	var intercepted string
-
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		bytes, _ := ioutil.ReadAll(r.Body)
-		intercepted = string(bytes)
-	})
-	go http.ListenAndServe(":"+strconv.Itoa(port), nil)
+	startLogInterceptor()
 
 	client := resty.New()
 	client.JSONMarshal = func(v interface{}) (bytes []byte, e error) {
@@ -87,4 +94,36 @@ func Test_SendingWithoutEmptyObject(t *testing.T) {
 	}
 
 	fmt.Println(intercepted)
+}
+
+func Test_ErrorFromStdlibShouldNotBeEmptyObject(t *testing.T) {
+
+	startLogInterceptor()
+
+	client := resty.New()
+	client.JSONMarshal = func(v interface{}) (bytes []byte, e error) {
+		return json.Marshal(v)
+	}
+
+	hook, e := NewSematextHook(client, "http://localhost:"+strconv.Itoa(port), "test", "test", "test")
+	if e != nil {
+		t.Fatal(e)
+	}
+
+	logrus.AddHook(hook)
+
+	logrus.WithError(stdliberr.New("test")).Error("something went wrong, and there is some error")
+
+	// wait until we intercept the message, but no longer than 1 second
+	start := time.Now()
+	for intercepted == "" || time.Now().Sub(start) > 1*time.Second {
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	if strings.Contains(intercepted, `"error":{}`) {
+		t.Error("message should not contain an empty object error ")
+	}
+
+	fmt.Println(intercepted)
+
 }

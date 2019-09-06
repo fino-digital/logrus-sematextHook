@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"reflect"
+	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -191,10 +193,24 @@ func (s sematextHook) sendWithExtraData(message *SematextMessage, fields logrus.
 		if ok && str == "" {
 			// skip empty fields
 			continue
+		} else if ok {
+			data[k] = v
+			continue
+		}
+
+		if structHasExportedFields(v) {
+			// if struct has exported fields, we can leave it to json.Marshal to build the output
+			data[k] = v
+			continue
 		}
 
 		if val, ok := v.(stackTracer); ok {
 			data[k] = fmt.Sprintf("%+v", val)
+			continue
+		}
+
+		if val, ok := v.(error); ok {
+			data[k] = val.Error()
 			continue
 		}
 
@@ -213,4 +229,28 @@ func min(a, b int) int {
 
 func (s sematextHook) logLevelMapper(level logrus.Level) string {
 	return AsLogbackLevel(level)
+}
+
+func structHasExportedFields(Iface interface{}) bool {
+	ValueIface := reflect.ValueOf(Iface)
+
+	// Check if the passed interface is a pointer
+	if ValueIface.Type().Kind() != reflect.Ptr {
+		// Create a new type of Iface's Type, so we have a pointer to work with
+		ValueIface = reflect.New(reflect.TypeOf(Iface))
+	}
+
+	if ValueIface.Elem().Kind() != reflect.Struct {
+		return false
+	}
+
+	for i := 0; i < ValueIface.Elem().Type().NumField(); i++ {
+		fieldName := ValueIface.Elem().Type().Field(i).Name
+		firstChar := fieldName[:1]
+		if firstChar == strings.ToUpper(firstChar) {
+			return true
+		}
+	}
+
+	return false
 }
