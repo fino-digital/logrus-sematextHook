@@ -1,6 +1,6 @@
 module github.com/fino-digital/sematextHook
 
-go 1.12
+go 1.13
 
 require (
 	github.com/go-resty/resty/v2 v2.0.0

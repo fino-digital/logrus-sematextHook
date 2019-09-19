@@ -198,19 +198,20 @@ func (s sematextHook) sendWithExtraData(message *SematextMessage, fields logrus.
 			continue
 		}
 
-		if structHasExportedFields(v) {
-			// if struct has exported fields, we can leave it to json.Marshal to build the output
-			data[k] = v
-			continue
-		}
-
 		if val, ok := v.(stackTracer); ok {
 			data[k] = fmt.Sprintf("%+v", val)
 			continue
 		}
 
-		if val, ok := v.(error); ok {
-			data[k] = val.Error()
+		if err, ok := v.(error); ok {
+			data[k] = err.Error()
+			continue
+		}
+
+		if structHasExportedFields(v) {
+			// if struct has exported fields, we can leave it to json.Marshal to build the output
+			marshal, _ := json.Marshal(v)
+			data[k] = marshal
 			continue
 		}
 
